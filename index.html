@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Management System</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 10px;
+            background-color: #f4f4f9;
+        }
+        h1 {
+            text-align: center;
+        }
+        .form-container {
+            margin-bottom: 20px;
+        }
+        input[type="text"], input[type="number"] {
+            padding: 8px;
+            margin: 5px;
+            width: 150px;
+        }
+        button {
+            padding: 8px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 8px;
+            border: 1px solid #ddd;
+            text-align: center;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        #lowStockReport {
+            margin-top: 20px;
+        }
+        #lowStockReport ul {
+            list-style-type: none;
+        }
+        #lowStockReport li {
+            margin: 5px 0;
+        }
+    </style>
+    <!-- Include jsPDF Library here -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+
+    <h1>Stock Management System</h1>
+    
+    <div class="form-container">
+        <input type="text" id="productName" placeholder="Product Name" />
+        <input type="number" id="productQuantity" placeholder="Quantity" />
+        <input type="number" id="minimalStock" placeholder="Minimal Stock" />
+        <button onclick="addProduct()">Add Product</button>
+    </div>
+
+    <h2>Product List</h2>
+    <table id="stockTable">
+        <thead>
+            <tr>
+                <th>Product Name</th>
+                <th>Quantity</th>
+                <th>Minimal Stock</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="productList"></tbody>
+    </table>
+
+    <h2>Low Stock Report</h2>
+    <button onclick="generateLowStockReport()">Generate Low Stock Report</button>
+    <button onclick="downloadPDF()">Download PDF</button>
+    <ul id="lowStockReport"></ul>
+
+    <script>
+        // Function to save the data to localStorage (simulating a "chat db")
+        function saveToStorage() {
+            let productList = document.querySelectorAll("#productList tr");
+            let stockData = [];
+            productList.forEach(row => {
+                let productName = row.children[0].innerText;
+                let productQuantity = row.children[1].innerText;
+                let minimalStock = row.children[2].innerText;
+                stockData.push({ name: productName, quantity: productQuantity, minimalStock: minimalStock });
+            });
+            localStorage.setItem('stockData', JSON.stringify(stockData));
+        }
+
+        // Function to load saved data from localStorage
+        function loadFromStorage() {
+            let storedData = localStorage.getItem('stockData');
+            if (storedData) {
+                let stockData = JSON.parse(storedData);
+                stockData.forEach(product => {
+                    addProductToTable(product.name, product.quantity, product.minimalStock);
+                });
+            }
+        }
+
+        // Function to add a new product to the table
+        function addProduct() {
+            let name = document.getElementById('productName').value;
+            let quantity = document.getElementById('productQuantity').value;
+            let minimalStock = document.getElementById('minimalStock').value;
+
+            if (!name || !quantity || isNaN(quantity) || quantity <= 0 || !minimalStock || isNaN(minimalStock) || minimalStock < 0) {
+                alert("Please enter valid product name, quantity, and minimal stock.");
+                return;
+            }
+
+            addProductToTable(name, quantity, minimalStock);
+
+            // Clear input fields
+            document.getElementById('productName').value = '';
+            document.getElementById('productQuantity').value = '';
+            document.getElementById('minimalStock').value = '';
+        }
+
+        // Function to add a product to the table
+        function addProductToTable(name, quantity, minimalStock) {
+            let tableBody = document.getElementById("productList");
+
+            let row = tableBody.insertRow();
+            let cell1 = row.insertCell(0);
+            let cell2 = row.insertCell(1);
+            let cell3 = row.insertCell(2);
+            let cell4 = row.insertCell(3);
+
+            cell1.innerText = name;
+            cell2.innerText = quantity;
+            cell3.innerText = minimalStock;
+            cell4.innerHTML = `<button onclick="editProduct(this)">Edit</button> <button onclick="deleteProduct(this)">Delete</button>`;
+
+            // Save updated data to localStorage
+            saveToStorage();
+        }
+
+        // Function to edit a product's name, quantity, or minimal stock
+        function editProduct(button) {
+            let row = button.parentElement.parentElement;
+            let name = row.children[0].innerText;
+            let quantity = row.children[1].innerText;
+            let minimalStock = row.children[2].innerText;
+
+            let newName = prompt("Enter new product name:", name);
+            let newQuantity = prompt("Enter new quantity:", quantity);
+            let newMinimalStock = prompt("Enter new minimal stock:", minimalStock);
+
+            if (newName && newQuantity && newMinimalStock && !isNaN(newQuantity) && newQuantity > 0 && !isNaN(newMinimalStock) && newMinimalStock >= 0) {
+                row.children[0].innerText = newName;
+                row.children[1].innerText = newQuantity;
+                row.children[2].innerText = newMinimalStock;
+
+                // Save updated data to localStorage
+                saveToStorage();
+            } else {
+                alert("Please enter valid details.");
+            }
+        }
+
+        // Function to delete a product from the table
+        function deleteProduct(button) {
+            let row = button.parentElement.parentElement;
+            row.remove();
+
+            // Save updated data to localStorage
+            saveToStorage();
+        }
+
+        // Function to generate low stock report
+        function generateLowStockReport() {
+            let lowStockList = document.getElementById("lowStockReport");
+            lowStockList.innerHTML = ''; // Clear any previous report
+
+            let storedData = localStorage.getItem('stockData');
+            if (storedData) {
+                let stockData = JSON.parse(storedData);
+                stockData.forEach(product => {
+                    if (parseInt(product.quantity) < parseInt(product.minimalStock)) {
+                        let li = document.createElement('li');
+                        li.innerText = `${product.name}: Current stock is ${product.quantity}, below the minimum stock of ${product.minimalStock}.`;
+                        lowStockList.appendChild(li);
+                    }
+                });
+            }
+        }
+
+        // Function to download the low stock report as PDF
+        function downloadPDF() {
+            const { jsPDF } = window.jspdf;
+            let doc = new jsPDF();
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(16);
+            doc.text('Low Stock Report', 20, 20);
+            doc.setFontSize(12);
+            
+            let storedData = localStorage.getItem('stockData');
+            let rowY = 30;
+            if (storedData) {
+                let stockData = JSON.parse(storedData);
+                stockData.forEach((product, index) => {
+                    if (parseInt(product.quantity) < parseInt(product.minimalStock)) {
+                        doc.text(`${product.name}: Current stock is ${product.quantity}, below the minimum stock of ${product.minimalStock}.`, 20, rowY);
+                        rowY += 10;
+                    }
+                });
+            }
+
+            doc.save('low_stock_report.pdf');
+        }
+
+        // Load stored products when the page loads
+        window.onload = loadFromStorage;
+    </script>
+
+</body>
+</html>
